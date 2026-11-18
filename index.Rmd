@@ -1,0 +1,176 @@
+---
+title: "Informe NILs"
+author: "David Clapés Gámez"
+date: "`r Sys.Date()`"
+output: 
+  github_document:
+    html_preview: false
+  html_document:
+    toc: true
+    number_sections: true
+bibliography: [libraries.bib]
+link-citations: TRUE
+---
+
+![](Logo_UCO.png){width=10%}
+
+![](Logo_FacCiencias.png){width=10%}
+
+------------------------------------------------------------------------
+
+<!-- Inicio Rmd -->
+
+<!-- Configuración global de los bloques de código, `echo = TRUE` -> todo el código utilizado en este documento aparecerá en el documento final salvo que se expecifique lo contrario, a excepción de este bloque de código, `include=TRUE`  -->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+<!-- Para generar títulos, subtítulos etc se usa # el número de # determina el estilo y el formato del texto -->
+
+# Introducción
+
+## El trabajo seleccionado
+
+<!-- Trabajamos los diferentes estilos de text (negrita, cursiva, tachado, superíndice y subíndice), notas a pie de página [^N], citas >  -->
+
+<!-- En HTML podemos usar la etiqueda de css para usar diferentes colores en el texto:  -->
+
+<!-- {style="color:______; font-size:_____;"} -->
+
+Vamos a trabajar con los datos de Pérez-Rial et al. 2024. Este trabajo describe [genes candidatos de la floración]{style="color: green;"} en [garbanzo]{style="color: red;"} (*Cicer arietinum*) como ***MED16***, ***BBX24*** o ***ELF3***, este último también reportado por otros estudios como Rigde et al. 2017. Los mecanismos básicos de floración estudiados en la planta modelo *Arabidopsis thaliana* están conservados en las leguminosas (Weller et al. 2019, Hecht et al. 2005, Weller et al. 2015), exceptuando ciertos genes como ***CONSTANS*** (Wong et al. 2014)
+
+## Los datos
+
+<!-- Leer los datos desde el fichero que está en la misma carpeta que Rmarkdown. Si el fichero está en otra carpeta actualizar la localización del archivo -->
+
+```{r leer-datos, echo=FALSE, warning=FALSE}
+library(readxl)
+Data <- read_excel("12870_2024_5411_MOESM1_ESM.xlsx", 
+    skip = 1)
+```
+
+<!-- Primera vista de los datos -->
+
+```{r vista-datos, echo=FALSE}
+knitr::kable(head(Data, 8), align = 'c', caption = "Tabla 1: Diez primeras filas")
+```
+
+<!-- El código R en línea -->
+
+Los datos tienen `r nrow(Data)` filas y `r ncol(Data)` columnas.
+
+Cada fila se corresponde con un SNP, por tanto, hay `r nrow(Data)` SNPs.
+
+<!-- cargar las librerias que vamos a utilizar, queremos que el código se ejecute, pero no que aparezca en el documento final, también excluímos los avisos y mensajes -->
+
+```{r cargar-librerias, echo=FALSE, warning=FALSE, message=FALSE}
+library('dplyr')
+library('ggplot2')
+```
+
+<!-- Filtra los datos para quedarte solo con los cromosomas (sus códigos empiezan por NC_) -->
+
+```{r Filtro-cromosomas, include = FALSE}
+Data_chr <- Data %>% filter(CHROM %in% c("NC_021160.1","NC_021161.1", "NC_021162.1", "NC_021163.1", "NC_021164.1", "NC_021165.1","NC_021166.1", "NC_021167.1"))
+```
+
+Del total de SNPs detectados, `r nrow(Data)` se corresponden con SNPs situados en cromosomas (Figura 1).
+
+<!-- Calcula el número de SNPs por cromosoma que tiene el garbanzo con la función `count` y guarda los datos ordenados de forma descendiente en variable nueva -->
+
+```{r cromosoma-con-mas-SNPs, echo = FALSE}
+Cromosoma <- Data_chr %>% 
+  count(CHROM) %>% 
+  arrange(desc(n))
+```
+
+<!-- Utilizar la variable nueva para hacer un gráfico de barras incluyendo el pie de figura y la posición -->
+
+```{r grafico-cromosoma-SNPs, echo=FALSE, out.width="60%", fig.cap="Figura 1. Número de SNPs por cromosomas", fig.align='center'}
+ggplot(Cromosoma) +
+  geom_col(aes(y = n, x = CHROM))+
+  xlab("Cromosomas")+
+  ylab("Num.SNPs")
+
+```
+
+## Hipótesis
+
+Nuestra hipótesis es que los cromosomas con mayor número de SNPs presentan mayor % de SNPs que no pasan el filtro de calidad
+
+------------------------------------------------------------------------
+
+# Materiales y Methods
+
+Para llevar a cabo el análisis usamos R con las librerias dplyr y ggplot.
+
+------------------------------------------------------------------------
+
+# Resultados
+
+<!-- Selecciona del dataset `Data` únicamente las columnas **CHROM**, **POS** y **FILTER**.   -->
+
+```{r seleccion_columnas, echo = FALSE}
+datos_filtrados <- Data_chr %>%
+  select(CHROM, POS, FILTER)
+```
+
+```{=html}
+<!-- Puedes describir las columnas con las que te quedas.
+<!-- Por ejemplo: En CHROM aparecen los diferentes cromosomas del garbanzo, 
+<!-- en POS aparecen las posiciones de los SNPs
+<!-- detectados y en FILTER aparece el filtro de calidad.
+<!-- Los SNPs que pasan el filtro aparecen
+<!-- descritos como PASS. -->
+```
+
+<!-- Crea una nueva variable en la que todo valor distinto de *PASS* se transforme en *NOT_PASS*.   -->
+
+```{r recodificacion, echo = FALSE}
+datos_filtrados <- datos_filtrados %>%
+  mutate(FILTER = ifelse(FILTER == "PASS", "PASS", "NOT_PASS"))
+```
+
+## Cálculo de porcentajes por cromosoma
+
+```{r, echo =FALSE}
+# Calcular el número total de SNPs y el porcentaje de NOT_PASS por cromosoma
+resumen_relacion <- datos_filtrados %>%
+  group_by(CHROM) %>%
+  summarise(
+    total_SNPs = n(),
+    not_pass = sum(FILTER == "NOT_PASS"),
+    porcentaje_not_pass = round(not_pass / total_SNPs * 100, 1)
+  )
+```
+
+El procentaje de SNPs que no pasan el filtro se muentra en la Tabla 2.
+
+```{r, echo = FALSE}
+knitr::kable(
+  resumen_relacion,
+  caption = "Tabla 2. Porcentaje de SNPs que pasan y no pasan el filtro por cromosoma"
+)
+```
+
+## Representación gráfica
+
+El siguiente modelo muestra la relación entre el número total y los SNPs no filtrados (Figura 2).
+
+```{r grafico-relacion, echo=FALSE, message=FALSE, warning=FALSE, fig.cap="Fig 2. Relación entre el número total de SNPs y el porcentaje de SNPs que no pasan el filtro de calidad"}
+ggplot(resumen_relacion, aes(x = total_SNPs, y = porcentaje_not_pass)) +
+  geom_point(color = "darkblue", size = 3) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(x = "Número total de SNPs por cromosoma",
+       y = "% de SNPs que no pasan el filtro")
+```
+
+------------------------------------------------------------------------
+
+# Conclusiones
+
+Los datos NO apoyan nuestra hipótesis. Es la contraria: los cromosomas en los que se detectan menos SNPs, presentan mayor porcentaje de SNPs que no pasan el filtro.
+
+# Bibliografía
+
